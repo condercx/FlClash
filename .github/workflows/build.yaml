@@ -1,4 +1,4 @@
-﻿name: build
+name: build
 
 on:
   push:
@@ -42,15 +42,6 @@ jobs:
           - platform: windows
             os: Windows-2022
             arch: amd64
-          - platform: linux
-            os: ubuntu-22.04
-            arch: amd64
-          - platform: macos
-            os: macos-15-intel
-            arch: amd64
-          - platform: macos
-            os: macos-latest
-            arch: arm64
 
     steps:
       - name: Checkout
@@ -78,10 +69,11 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: "1.22"
 
-      - name: Setup Project
-        run: dart run setup.dart ${{ matrix.platform }} -v
+      - name: Sync go modules
+        working-directory: ./core/Clash.Meta
+        run: go mod tidy
 
       - name: Build Clash Meta For Android
         working-directory: ./core/Clash.Meta
@@ -93,16 +85,6 @@ jobs:
         run: make windows-amd64-v3
         if: ${{ matrix.platform == 'windows' }}
 
-      - name: Build Clash Meta For Linux
-        working-directory: ./core/Clash.Meta
-        run: make linux-amd64-v3
-        if: ${{ matrix.platform == 'linux' }}
-
-      - name: Build Clash Meta For Macos
-        working-directory: ./core/Clash.Meta
-        run: make darwin-${{ matrix.arch }}
-        if: ${{ matrix.platform == 'macos' }}
-
       - name: Build Flutter Android
         run: flutter build apk --release --split-per-abi
         if: ${{ matrix.platform == 'android' }}
@@ -111,14 +93,6 @@ jobs:
         run: flutter build windows --release
         if: ${{ matrix.platform == 'windows' }}
 
-      - name: Build Flutter Linux
-        run: flutter build linux --release
-        if: ${{ matrix.platform == 'linux' }}
-
-      - name: Build Flutter Macos
-        run: flutter build macos --release
-        if: ${{ matrix.platform == 'macos' }}
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -126,8 +100,6 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/*.apk
             build/windows/runner/Release/**
-            build/linux/x64/release/**
-            build/macos/Build/Products/Release/**
             core/Clash.Meta/bin/**
 
   upload:
@@ -148,9 +120,8 @@ jobs:
 
       - name: Generate release.md
         run: |
-          tags=($(git tag --merged HEAD --sort=-creatordate))
-          preTag=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
-          sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p')
+          tags=$(git tag --merged HEAD --sort=-creatordate)
+          preTag=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p')
           [ -z "$preTag" ] && preTag=""
           out="release.md"
           > "$out"
@@ -159,8 +130,7 @@ jobs:
             [[ "$curr" == "$preTag" ]] && break
             prev="${tags[i+1]}"
             range="${prev:+$prev..}$curr"
-            git log --no-merges --pretty=format:"%B" "$range" | \
-            awk '!/Update changelog/ && NF {print "- " $0 "\n"}' >> "$out"
+            git log --no-merges --pretty=format:"%B" "$range" | awk '!/Update changelog/ && NF {print "- " $0 "\n"}' >> "$out"
           done
 
       - name: Patch release.md
