@@ -80,7 +80,7 @@ jobs:
           esac
 
       - name: Setup (Flutter build + packaging)
-        run: dart setup.dart ${{ matrix.platform }} ${{ matrix.platform == 'android' && format('--arch {0}', matrix.arch) || '' }}
+        run: dart setup.dart ${{ matrix.platform }}
 
       - name: Copy mihomo binary to dist
         shell: bash
