@@ -1,4 +1,4 @@
-name: build
+﻿name: build
 
 on:
   push:
@@ -51,22 +51,8 @@ jobs:
           - platform: macos
             os: macos-latest
             arch: arm64
-          - platform: windows
-            os: windows-11-arm
-            arch: arm64
-          - platform: linux
-            os: ubuntu-24.04-arm
-            arch: arm64
 
     steps:
-      - name: Setup rust
-        if: startsWith(matrix.os, 'windows-11-arm')
-        run: |
-          Invoke-WebRequest -Uri "https://win.rustup.rs/aarch64" -OutFile rustup-init.exe
-          .\rustup-init.exe -y --default-toolchain stable
-          $cargoPath = "$env:USERPROFILE\.cargo\bin"
-          Add-Content $env:GITHUB_PATH $cargoPath
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -86,15 +72,6 @@ jobs:
           flutter-version: 3.41.9
           cache: true
 
-      - name: Setup Flutter With Other
-        if: startsWith(matrix.os, 'windows-11-arm') || startsWith(matrix.os, 'ubuntu-24.04-arm')
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: '3.41.9'
-          cache: true
-          architecture: arm64
-
       - name: Install dependencies
         run: flutter pub get
 
@@ -108,28 +85,23 @@ jobs:
 
       - name: Build Clash Meta For Android
         working-directory: ./core/Clash.Meta
-        run: make android arm64
+        run: make android-arm64
         if: ${{ matrix.platform == 'android' }}
 
       - name: Build Clash Meta For Windows
         working-directory: ./core/Clash.Meta
-        run: make windows amd64
+        run: make windows-amd64-v3
         if: ${{ matrix.platform == 'windows' }}
 
       - name: Build Clash Meta For Linux
         working-directory: ./core/Clash.Meta
-        run: make linux amd64
+        run: make linux-amd64-v3
         if: ${{ matrix.platform == 'linux' }}
 
       - name: Build Clash Meta For Macos
         working-directory: ./core/Clash.Meta
-        run: make darwin amd64
-        if: ${{ matrix.platform == 'macos' && matrix.arch == 'amd64' }}
-
-      - name: Build Clash Meta For Macos
-        working-directory: ./core/Clash.Meta
-        run: make darwin arm64
-        if: ${{ matrix.platform == 'macos' && matrix.arch == 'arm64' }}
+        run: make darwin-${{ matrix.arch }}
+        if: ${{ matrix.platform == 'macos' }}
 
       - name: Build Flutter Android
         run: flutter build apk --release --split-per-abi
