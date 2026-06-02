@@ -136,20 +136,34 @@ jobs:
         run: flutter build macos --release
         if: ${{ matrix.platform == 'macos' }}
 
-      - name: Collect artifacts
+      - name: Collect artifacts (Android)
+        if: ${{ matrix.platform == 'android' }}
         run: |
           mkdir -p ./dist
-          # Android APKs
-          ls build/app/outputs/flutter-apk/*.apk 2>/dev/null && cp build/app/outputs/flutter-apk/*.apk ./dist/ || true
-          # Clash Meta binary
-          ls core/Clash.Meta/bin/* 2>/dev/null && cp core/Clash.Meta/bin/* ./dist/ || true
-          # Windows
-          ls build/windows/runner/Release/*.exe 2>/dev/null && cp build/windows/runner/Release/*.exe ./dist/ || true
-          # Linux
-          ls build/linux/x64/release/bundle 2>/dev/null && cp -r build/linux/x64/release/bundle ./dist/ || true
-          ls build/linux/arm64/release/bundle 2>/dev/null && cp -r build/linux/arm64/release/bundle ./dist/ || true
-          # macOS
-          ls build/macos/Build/Products/Release/*.app 2>/dev/null && cp -r build/macos/Build/Products/Release/*.app ./dist/ || true
+          cp build/app/outputs/flutter-apk/*.apk ./dist/
+          cp core/Clash.Meta/bin/* ./dist/ 2>/dev/null || true
+
+      - name: Collect artifacts (Windows)
+        if: ${{ matrix.platform == 'windows' }}
+        shell: bash
+        run: |
+          mkdir -p ./dist
+          if ls build/windows/runner/Release/*.exe 2>/dev/null; then cp build/windows/runner/Release/*.exe ./dist/; fi
+          if ls core/Clash.Meta/bin/* 2>/dev/null; then cp core/Clash.Meta/bin/* ./dist/; fi
+
+      - name: Collect artifacts (Linux)
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          mkdir -p ./dist
+          cp -r build/linux/*/release/bundle ./dist/ 2>/dev/null || true
+          cp core/Clash.Meta/bin/* ./dist/ 2>/dev/null || true
+
+      - name: Collect artifacts (macOS)
+        if: ${{ matrix.platform == 'macos' }}
+        run: |
+          mkdir -p ./dist
+          cp -r build/macos/Build/Products/Release/*.app ./dist/ 2>/dev/null || true
+          cp core/Clash.Meta/bin/* ./dist/ 2>/dev/null || true
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -181,6 +195,7 @@ jobs:
           preTag=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p')
           [ -z "$preTag" ] && preTag=""
           out="release.md"
+          currentTag=""
           > "$out"
           for ((i = 0; i <= ${#tags[@]}; i++)); do
             if (( i < ${#tags[@]} )); then
