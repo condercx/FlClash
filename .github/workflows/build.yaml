@@ -101,12 +101,17 @@ jobs:
 
       - name: Build Clash Meta For Linux
         working-directory: ./core/Clash.Meta
-        run: make linux-${{ matrix.arch }}-v3
-        if: ${{ matrix.platform == 'linux' }}
+        run: make linux-amd64-v3
+        if: ${{ matrix.platform == 'linux' && matrix.arch == 'amd64' }}
+
+      - name: Build Clash Meta For Linux ARM64
+        working-directory: ./core/Clash.Meta
+        run: make linux-arm64
+        if: ${{ matrix.platform == 'linux' && matrix.arch == 'arm64' }}
 
       - name: Build Clash Meta For macOS
         working-directory: ./core/Clash.Meta
-        run: make darwin-${{ matrix.arch == 'amd64' && 'amd64-v3' || 'arm64' }}
+        run: make darwin-arm64
         if: ${{ matrix.platform == 'macos' }}
 
       - name: Build Flutter Android
