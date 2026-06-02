@@ -1,4 +1,4 @@
-name: build
+﻿name: build
 
 on:
   push:
@@ -35,6 +35,7 @@ jobs:
     needs: [ test ]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - platform: android
@@ -42,6 +43,18 @@ jobs:
           - platform: windows
             os: Windows-2022
             arch: amd64
+          - platform: linux
+            os: ubuntu-latest
+            arch: amd64
+          - platform: linux
+            os: ubuntu-latest
+            arch: arm64
+          - platform: macos
+            os: macos-13
+            arch: amd64
+          - platform: macos
+            os: macos-latest
+            arch: arm64
 
     steps:
       - name: Checkout
@@ -69,10 +82,14 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: '1.22'
 
-      - name: Sync go modules
+      - name: Sync Clash.Meta go modules
         working-directory: ./core/Clash.Meta
+        run: go mod tidy
+
+      - name: Sync core go modules
+        working-directory: ./core
         run: go mod tidy
 
       - name: Build Clash Meta For Android
@@ -85,6 +102,16 @@ jobs:
         run: make windows-amd64-v3
         if: ${{ matrix.platform == 'windows' }}
 
+      - name: Build Clash Meta For Linux
+        working-directory: ./core/Clash.Meta
+        run: make linux-${{ matrix.arch }}-v3
+        if: ${{ matrix.platform == 'linux' }}
+
+      - name: Build Clash Meta For macOS
+        working-directory: ./core/Clash.Meta
+        run: make darwin-${{ matrix.arch == 'amd64' && 'amd64-v3' || 'arm64' }}
+        if: ${{ matrix.platform == 'macos' }}
+
       - name: Build Flutter Android
         run: flutter build apk --release --split-per-abi
         if: ${{ matrix.platform == 'android' }}
@@ -93,6 +120,14 @@ jobs:
         run: flutter build windows --release
         if: ${{ matrix.platform == 'windows' }}
 
+      - name: Build Flutter Linux
+        run: flutter build linux --release
+        if: ${{ matrix.platform == 'linux' }}
+
+      - name: Build Flutter macOS
+        run: flutter build macos --release
+        if: ${{ matrix.platform == 'macos' }}
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -100,6 +135,9 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/*.apk
             build/windows/runner/Release/**
+            build/linux/x64/release/**
+            build/linux/arm64/release/**
+            build/macos/Build/Products/Release/**
             core/Clash.Meta/bin/**
 
   upload:
