@@ -1,4 +1,4 @@
-﻿module core
+module core
 
 go 1.21
 
