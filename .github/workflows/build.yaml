@@ -136,21 +136,32 @@ jobs:
         run: flutter build macos --release
         if: ${{ matrix.platform == 'macos' }}
 
+      - name: Collect artifacts
+        run: |
+          mkdir -p ./dist
+          # Android APKs
+          ls build/app/outputs/flutter-apk/*.apk 2>/dev/null && cp build/app/outputs/flutter-apk/*.apk ./dist/ || true
+          # Clash Meta binary
+          ls core/Clash.Meta/bin/* 2>/dev/null && cp core/Clash.Meta/bin/* ./dist/ || true
+          # Windows
+          ls build/windows/runner/Release/*.exe 2>/dev/null && cp build/windows/runner/Release/*.exe ./dist/ || true
+          # Linux
+          ls build/linux/x64/release/bundle 2>/dev/null && cp -r build/linux/x64/release/bundle ./dist/ || true
+          ls build/linux/arm64/release/bundle 2>/dev/null && cp -r build/linux/arm64/release/bundle ./dist/ || true
+          # macOS
+          ls build/macos/Build/Products/Release/*.app 2>/dev/null && cp -r build/macos/Build/Products/Release/*.app ./dist/ || true
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: artifact-${{ matrix.platform }}${{ matrix.arch && format('-{0}', matrix.arch) }}
-          path: |
-            build/app/outputs/flutter-apk/*.apk
-            build/windows/runner/Release/**
-            build/linux/x64/release/**
-            build/linux/arm64/release/**
-            build/macos/Build/Products/Release/**
-            core/Clash.Meta/bin/**
+          path: ./dist/
+          overwrite: true
 
   upload:
     needs: [ build ]
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -166,17 +177,31 @@ jobs:
 
       - name: Generate release.md
         run: |
-          tags=$(git tag --merged HEAD --sort=-creatordate)
+          tags=($(git tag --merged HEAD --sort=-creatordate))
           preTag=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p')
           [ -z "$preTag" ] && preTag=""
           out="release.md"
           > "$out"
-          for i in "${!tags[@]}"; do
-            curr="${tags[i]}"
-            [[ "$curr" == "$preTag" ]] && break
-            prev="${tags[i+1]}"
-            range="${prev:+$prev..}$curr"
-            git log --no-merges --pretty=format:"%B" "$range" | awk '!/Update changelog/ && NF {print "- " $0 "\n"}' >> "$out"
+          for ((i = 0; i <= ${#tags[@]}; i++)); do
+            if (( i < ${#tags[@]} )); then
+              tag=${tags[$i]}
+            else
+              tag=""
+            fi
+            if [ -n "$currentTag" ]; then
+              if [ "$(echo -e "$currentTag\n$preTag" | sort -V | head -n 1)" == "$currentTag" ]; then
+                break
+              fi
+            fi
+            if [ -n "$currentTag" ]; then
+              if [ -n "$tag" ]; then
+                git log --pretty=format:"%B" "$tag..$currentTag" | awk 'NF {print "- " $0} !NF {print ""}' >> "$out"
+              else
+                git log --pretty=format:"%B" "$currentTag" | awk 'NF {print "- " $0} !NF {print ""}' >> "$out"
+              fi
+              echo "" >> "$out"
+            fi
+            currentTag=$tag
           done
 
       - name: Patch release.md
