@@ -1,4 +1,4 @@
-﻿name: build
+name: build
 
 on:
   push:
@@ -49,9 +49,6 @@ jobs:
           - platform: linux
             os: ubuntu-latest
             arch: arm64
-          - platform: macos
-            os: macos-13
-            arch: amd64
           - platform: macos
             os: macos-latest
             arch: arm64
@@ -119,6 +116,12 @@ jobs:
       - name: Build Flutter Windows
         run: flutter build windows --release
         if: ${{ matrix.platform == 'windows' }}
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev liblzma-dev libstdc++-12-dev
+        if: ${{ matrix.platform == 'linux' }}
 
       - name: Build Flutter Linux
         run: flutter build linux --release
