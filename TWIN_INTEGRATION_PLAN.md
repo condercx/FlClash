@@ -22,9 +22,9 @@ nowhere/
 │   │       ├── config.go              默认/最大窗口配置
 │   │       ├── quic.go               QUIC Config 工厂
 │   │       ├── auth.go               密码认证 + 带宽协商
-│   │       ├── client.go             客户端拨号 + BrutalSender + OpenStream 超时保护
+│   │       ├── client.go             客户端拨号 + BrutalSender + 超时保护 + SideChannel
 │   │       ├── server.go             服务端监听
-│   │       ├── portal_session.go     服务端连接管理 + TCP/UDP 带超时代理
+│   │       ├── portal_session.go     服务端连接管理 + TCP/UDP 代理 + SideChannel
 │   │       ├── protocol.go           UDP 数据报序列化 + 分片重组
 │   │       ├── sidechannel.go        双通道选择策略
 │   │       ├── sideframe.go          SideChannel 帧编解码
@@ -59,15 +59,27 @@ nowhere/
 - **New**：`protocol.go` — udpMessage 序列化、分片/重组，服务端 udpRelay
 - **New**：`client.go` — `NewUDPSession()` QUIC datagram 式 UDP 回话
 - **New**：`config.go` / `quic.go` — `KeepAlivePeriod`、`MaxIdleTimeout`、`DisablePMTU` 可配置
-- 在 VPS 多线程测试中：多线程高速下载后上传卡死（stream.Write 流控阻塞）
+- 多线程高速下载后上传卡死（stream.Write 流控阻塞）
 
-### v0.0.4 — 多线程卡死修复 + 超时保护 (当前版本)
-- **Bug 修复**：client.go `OpenStream()` → `OpenStreamSync()` 带 context 超时
-- **Bug 修复**：client.go `writeHeader()` — 协议头写入带 `SetWriteDeadline(10s)`，避免 stream.Write 永久阻塞
-- **Bug 修复**：portal_session.go `net.Dial("tcp")` → `net.DialTimeout("tcp", ..., 10s)`
-- **Bug 修复**：portal_session.go TCP/UDP 转发 `io.Copy` → 32KB buf 读写循环，带 `SetReadDeadline`/`SetWriteDeadline(300s)`
-- **Bug 修复**：adapter/twin.go DialContext 错误时立即 `cleanupLocked()`，下次调用 `ensureConn` 会重建完整连接
-- 本地/远端端到端测试通过，多线程测速后不会 timeout
+### v0.0.4 — 多线程卡死修复 (完成 ✅)
+- `OpenStream()` → `OpenStreamSync(ctx)` 带 10s 超时
+- 协议头写入 `writeHeader()` 带 `SetWriteDeadline(10s)`
+- `net.Dial` → `net.DialTimeout(10s)`
+- adapter 错误时 `cleanupLocked()` 立即重建连接
+- ⚠️ 回归：per-call SetReadDeadline/SetWriteDeadline 导致延迟 +10ms
+
+### v0.0.5 — 回归修复 + SideChannel 数据面 (当前版本)
+- **P0 修复**：portal_session.go 恢复 `io.Copy`（替换手动 buf 循环）
+- **P0 修复**：TCP idle timeout 改用 `context.WithTimeout` + goroutine，而非 per-call SetDeadline
+- **P0 修复**：延迟回到与 v0.0.3 一致（降 10ms）
+- **P0 记录**：多线程测速后数秒恢复（非阻塞，下次连接自动建立）— 已知窗口期问题
+- **P1 新增**：`type 0x03` SideChannel 流 — 客户端 `openSideStream()` 自动打开一条独立 QUIC 流保持长连接
+- **P1 新增**：服务端 `handleStream` 收到 0x03 后保持流存活（`<-ps.ctx.Done()`），为 SideChannel 数据面准备
+
+## 遗留问题
+- 多线程高速测速结束后，服务端/客户端连接短暂不可用，数秒后自动恢复
+- 原因：BrutalSender 在高速发包退出时，ACK 处理滞后，QUIC 流控需要时间重新平衡
+- 后续优化方向：连接关闭前做优雅 drain，减少流控恢复时间
 
 ## CI/CD
 
