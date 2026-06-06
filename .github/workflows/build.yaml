@@ -81,7 +81,9 @@ jobs:
 
       - name: Determine twin version
         id: twin_ver
+        shell: bash
         run: |
+          git -C core/twin fetch --tags --depth 1 origin 2>&1 || true
           TV=$(cd core/twin && git describe --tags --always 2>/dev/null || echo "dev")
           echo "TWIN_VERSION=${TV#v}" >> $GITHUB_ENV
 
@@ -102,7 +104,9 @@ jobs:
             if [ -f "$f" ]; then
               newname=$(echo "$f" | sed "s/^\(FlClash-[^-]*\)/\1-twin-${TV}/")
               echo "  $f -> $newname"
-              mv "$f" "$newname"
+              if [ "$f" != "$newname" ]; then
+                mv "$f" "$newname"
+              fi
             fi
           done
 
